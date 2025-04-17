@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日历卡片生成工具</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; background: #111; margin: 0; padding: 0; }
+    .container { max-width: 400px; margin: 40px auto; background: #181818; border-radius: 18px; box-shadow: 0 4px 32px rgba(255,140,0,0.10); padding: 28px; }
+    .input-group { margin-bottom: 18px; }
+    label { display: block; margin-bottom: 6px; color: #ff9100; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+    input, textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #333; background: #222; color: #fff; border-radius: 8px; font-size: 16px; }
+    textarea { resize: vertical; min-height: 60px; }
+    button { background: #ff9100; color: #181818; border: none; border-radius: 8px; padding: 12px 0; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s, color 0.2s; letter-spacing: 1px; }
+    button:hover { background: #fff; color: #ff9100; }
+    .card-preview { margin: 28px 0 16px 0; display: flex; justify-content: center; }
+    .calendar-card { width: 320px; min-height: 220px; background: linear-gradient(135deg, #181818 80%, #222 100%); border-radius: 20px; box-shadow: 0 4px 32px rgba(255,140,0,0.12); padding: 32px 22px; display: flex; flex-direction: column; align-items: flex-start; position: relative; overflow: hidden; }
+    .calendar-card::before { content: ""; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,145,0,0.18) 0%, rgba(255,145,0,0.04) 80%); border-radius: 50%; z-index: 0; }
+    .calendar-date { font-size: 40px; font-weight: 900; color: #ff9100; margin-bottom: 10px; letter-spacing: 2px; z-index: 1; }
+    .calendar-week { font-size: 18px; color: #fff; opacity: 0.7; margin-bottom: 14px; font-weight: 500; z-index: 1; }
+    .calendar-content { font-size: 22px; color: #fff; margin-bottom: 18px; text-align: left; word-break: break-all; font-weight: 600; line-height: 1.5; z-index: 1; }
+    .calendar-source { font-size: 15px; color: #ff9100; align-self: flex-end; font-style: italic; z-index: 1; }
+    @media (max-width: 400px) { .container, .calendar-card { width: 100%; min-width: 0; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="input-group">
+      <label for="content">文案内容</label>
+      <textarea id="content" placeholder="请输入日历卡片文案"></textarea>
+    </div>
+    <div class="input-group">
+      <label for="source">来源</label>
+      <input id="source" type="text" placeholder="请输入文案来源（可选）" />
+    </div>
+    <button id="generate">生成卡片</button>
+    <button id="random-quote" style="margin-top:10px;background:#222;color:#ff9100;border:1.5px solid #ff9100;">随机</button>
+    <div class="card-preview">
+      <div id="calendar-card" class="calendar-card" style="display:none">
+        <div class="calendar-date" id="card-date"></div>
+        <div class="calendar-week" id="card-week"></div>
+        <div class="calendar-content" id="card-content"></div>
+        <div class="calendar-source" id="card-source"></div>
+      </div>
+    </div>
+    <button id="download" style="display:none">下载卡片图片</button>
+  </div>
+  <script>
+    function getNowDateInfo() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const date = now.getDate();
+      const weekArr = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+      const week = weekArr[now.getDay()];
+      return { year, month, date, week };
+    }
+    function renderCard(content, source) {
+      const { year, month, date, week } = getNowDateInfo();
+      document.getElementById('card-date').textContent = `${year}-${month.toString().padStart(2,'0')}-${date.toString().padStart(2,'0')}`;
+      document.getElementById('card-week').textContent = week;
+      document.getElementById('card-content').textContent = content;
+      document.getElementById('card-source').textContent = source ? `—— ${source}` : '';
+      document.getElementById('calendar-card').style.display = 'flex';
+      document.getElementById('download').style.display = 'block';
+    }
+    document.getElementById('generate').onclick = function() {
+      const content = document.getElementById('content').value.trim();
+      const source = document.getElementById('source').value.trim();
+      if (!content) { alert('请输入文案内容'); return; }
+      renderCard(content, source);
+    };
+    document.getElementById('download').onclick = function() {
+      const card = document.getElementById('calendar-card');
+      html2canvas(card, {backgroundColor: null, scale: 2}).then(canvas => {
+        const link = document.createElement('a');
+        link.download = '日历卡片.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    };
+    document.getElementById('random-quote').onclick = async function() {
+      const btn = this;
+      btn.disabled = true;
+      btn.textContent = '加载中...';
+      try {
+        const requestTimestamp = new Date().toISOString();
+        const requestBody = {
+          model: 'THUDM/GLM-4-32B-0414',
+          stream: false,
+          max_tokens: 512,
+          temperature: 0.7,
+          top_p: 0.7,
+          top_k: 50,
+          frequency_penalty: 0.5,
+          n: 1,
+          stop: [],
+          messages: [
+            {
+              role: 'user',
+              content: '请你作为一位金句收藏家，结合影视剧、名人名言、名著、歌词等不同领域，随机回复一句有深度、有哲理、有启发性的金句，并给出详细出处（如作者、作品名、年代等）。输出为json，内容字段为text，出处字段为author，author里直接给出出处，不要在里面拆分增加其他变量。不要重复近期的内容。'
+            }
+          ]
+        };
+        console.log('[日志] 请求时间:', requestTimestamp);
+        console.log('[日志] 请求体:', JSON.stringify(requestBody));
+        const res = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer sk-wmjcqgatnmzckvrwbkklwggxwkdfselzzfuigaqinkriozow',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+        console.log('[日志] 响应状态:', res.status);
+        const data = await res.json();
+        console.log('[日志] 原始响应数据:', JSON.stringify(data));
+        let content = '', author = '';
+        if (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          // 提取content中的json
+          const match = data.choices[0].message.content.match(/\{[\s\S]*\}/);
+          console.log('[日志] 匹配到的json字符串:', match ? match[0] : null);
+          if (match) {
+            try {
+              const obj = JSON.parse(match[0]);
+              content = obj.text || '';
+              author = obj.author || '';
+              console.log('[日志] 解析后的内容:', content, '作者:', author);
+            } catch(e) {
+              console.log('[日志] JSON解析异常:', e);
+            }
+          }
+        }
+        if (!content) {
+          alert('未获取到金句，请重试');
+        } else {
+          document.getElementById('content').value = content;
+          document.getElementById('source').value = author;
+        }
+      } catch (e) {
+        alert('请求失败，请检查网络或稍后重试');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '随机';
+      }
+    };
+  </script>
+</body>
+</html>
